@@ -120,7 +120,7 @@
 
 (defn trim-game-num
   [line]
-  (second (str/split line #": ")))
+  (second (str/split line #": +")))
 
 (defn get-games
   [line]
@@ -371,3 +371,76 @@
          r (m-reach-all lines)]
      (reduce + (map (fn [star-pos]
                       (star-sum star-pos r)) star-pos)))))
+
+;; day 4
+;; part 1
+
+(defn str-of-num-to-set
+  [s]
+  (set (map #(Integer/parseInt %) (str/split s  #" +"))))
+
+(defn line-to-intersection
+  [line]
+  (let [halfs (str/split (trim-game-num line) #" \| +")]
+    (clojure.set/intersection
+     (str-of-num-to-set (first halfs))
+     (str-of-num-to-set (second halfs)))))
+
+(defn intersection-sum
+  [i]
+  (reduce (fn [acc cur]
+            (if (= acc 0)
+              1
+              (* 2 acc))) 0 i))
+
+(defn line-to-sum
+  [line]
+  (intersection-sum (line-to-intersection line)))
+
+(defn day4-1
+  ([] (day4-1 (get-day 4)))
+  ([lines]
+   (reduce + (map line-to-sum lines))))
+
+;; part 2
+
+(defn line-to-wins
+  [line]
+  (count (line-to-intersection line)))
+
+(defn lines-to-wins
+  [lines]
+  (map line-to-wins lines))
+
+(defn ones [n] (map (fn [a] 1) (range n)))
+
+(defn zip-wins-with-1s
+  [lines]
+  (map vector (lines-to-wins lines) (ones (count lines))))
+
+(defn inc-amount-tuple
+  [i tup]
+  (let [wins (first tup)
+        amount (second tup)]
+    [wins (+ i amount)]))
+
+(defn do-win
+  [n wins tups]
+  (into (drop wins tups) (reverse (map #(inc-amount-tuple n %) (take wins tups)))))
+
+(defn day4-2
+  ([] (day4-2 (get-day 4)))
+  ([lines]
+   (let [w (zip-wins-with-1s lines)]
+     (loop [result 0
+            head (first w)
+            tail (rest w)]
+       (if head
+         (let [wins (first head)
+               amount (second head)
+               new-tail (do-win amount wins tail)]
+           (recur
+            (+ result amount)
+            (first new-tail)
+            (rest new-tail)))
+         result)))))
