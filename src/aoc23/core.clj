@@ -177,6 +177,8 @@
          (recur (+ result game) (inc game) (rest remaining))
          (recur result (inc game) (rest remaining)))))))
 
+;; part 2
+
 (defn calc-power
   [maxes]
   (reduce * (map second maxes)))
@@ -192,3 +194,180 @@
          (recur
           (+ result (calc-power maxes))
           (rest remaining)))))))
+
+;; day 3
+;; part 1
+
+(defn get-nums-indexed
+  [line]
+  (filter #(char-is-int (first %)) (map vector line (range (.length line)))))
+
+(defn get-takes
+  ([line]
+   (let [indexed (get-nums-indexed line)]
+     (loop [result []
+            tak 1
+            prev (first indexed)
+            cur (second indexed)
+            tail (rest (rest indexed))]
+       (if cur
+         (if (= (second prev) (dec (second cur)))
+           (recur result (inc tak) cur (first tail) (rest tail))
+           (recur (conj result tak) 1 cur (first tail) (rest tail)))
+         result)))))
+
+(defn collect-group
+  ([line] (collect-group (get-nums-indexed line) (get-takes line)))
+  ([indexed takes]
+   (loop [result []
+          idx-tail indexed
+          takes-head (first takes)
+          takes-tail (rest takes)]
+     (if takes-head
+       (recur
+        (conj result (take takes-head idx-tail))
+        (drop takes-head idx-tail)
+        (first takes-tail)
+        (rest takes-tail))
+       (conj result idx-tail)))))
+
+(defn get-vals-with-poss
+  [line]
+  (let [a (collect-group line)]
+    (map (fn [group]
+           {:pos (map second group)
+            :val (Integer/parseInt
+                  (reduce str "" (map first group)))}) a)))
+
+(defn check-left
+  [l pos]
+  (let [new-pos (dec pos)]
+    (if (>= new-pos 0)
+      (let [c (.charAt l new-pos)]
+        (and (not (char-is-int c)) (not= \. c)))
+      false)))
+
+(defn check-right
+  [l pos]
+  (let [new-pos (inc pos)
+        width (.length l)]
+    (if (< new-pos width)
+      (let [c (.charAt l new-pos)]
+        (and (not (char-is-int c)) (not= \. c)))
+      false)))
+
+(defn check-under
+  [l pos line-width]
+  (let [width (.length l)
+        new-pos (+ line-width pos)]
+    (if (< new-pos width)
+      (let [c (.charAt l new-pos)]
+        (and (not (char-is-int c)) (not= \. c)))
+      false)))
+
+(defn check-over
+  [l pos line-width]
+  (let [width (.length l)
+        new-pos (- pos line-width)]
+    (if (>= new-pos 0)
+      (let [c (.charAt l new-pos)]
+        (and (not (char-is-int c)) (not= \. c)))
+      false)))
+
+(defn check-diagonals
+  [l pos line-width]
+  (or
+   (check-under l (inc pos) line-width)
+   (check-under l (dec pos) line-width)
+   (check-over l (inc pos) line-width) 
+   (check-over l (dec pos) line-width)))
+
+(defn check-all
+  [l pos line-width]
+  (or
+   (check-diagonals l pos line-width)
+   (check-over l pos line-width)
+   (check-under l pos line-width)
+   (check-left l pos)
+   (check-right l pos)))
+
+(defn day3-1
+  [lines]
+  (let [width (.length (first lines))
+        l (reduce str lines)
+        vals-pos (get-vals-with-poss l)]
+    (reduce + (map (fn [e]
+                     (let [positions (:pos e)
+                           value (:val e)
+                           found (reduce #(or %1 %2) (map #(check-all l % width) positions))]
+                       (if found
+                         value
+                         0)))
+                   vals-pos))))
+
+;; part 2
+
+(defn check
+  [c]
+  (= \* c))
+
+(defn check-inside
+  [pos l]
+  (and (>= pos 0) (< (.length l))))
+
+(defn reach
+  [position width]
+  [(+ position 1)
+   (- position 1)
+   (+ position width)
+   (- position width)
+   (+ position width 1)
+   (- (+ position width) 1)
+   (+ (- position width) 1)
+   (- position width 1)])
+
+(defn m-reach
+  [m width]
+  (let [{pos :pos
+         val :val} m
+        new-pos (map #(reach % width) pos)
+        c-new-pos (reduce into new-pos)]
+    {:pos (set c-new-pos) :val val}))
+
+(defn m-reach-all
+  [lines]
+  (let [l (reduce str lines)
+        width (.length (first lines))
+        vwp (get-vals-with-poss l)]
+    (map #(m-reach % width) vwp)))
+
+(defn get-star-pos
+  [lines]
+  (let [l (reduce str lines)]
+    (map second
+         (filter #(check (first %))
+                 (map vector l (range (.length l)))))))
+
+(defn star-matches
+  [star-pos reaches]
+  (filter (fn [{pos :pos
+                val :val}]
+            (contains? pos star-pos)) reaches))
+
+(defn star-match-to-sum
+  [m]
+  (if (= (count m) 2)
+    (reduce * (map :val m))
+    0))
+
+(defn star-sum
+  [star-pos reaches]
+  (star-match-to-sum (star-matches star-pos reaches)))
+
+(defn day3-2
+  ([] (day3-2 (get-day 3)))
+  ([lines]
+   (let [star-pos (get-star-pos lines)
+         r (m-reach-all lines)]
+     (reduce + (map (fn [star-pos]
+                      (star-sum star-pos r)) star-pos)))))
